@@ -7,6 +7,16 @@ export const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
+// Custom Error class to carry status codes
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 class RealApiService {
   
   private getHeaders() {
@@ -20,28 +30,40 @@ class RealApiService {
   private async handleResponse(response: Response) {
     if (!response.ok) {
       const errorText = await response.text();
+      let errorMessage = errorText;
       try {
           const errorJson = JSON.parse(errorText);
-          throw new Error(errorJson.message || errorText);
-      } catch {
-          throw new Error(errorText || `HTTP Error: ${response.status}`);
-      }
+          errorMessage = errorJson.message || errorText;
+      } catch {}
+      
+      // Throw custom ApiError with status code
+      throw new ApiError(errorMessage || `HTTP Error: ${response.status}`, response.status);
     }
     return response.json();
   }
 
-  // Generic fallback wrapper
+  // Smart fallback wrapper
+  // - Falls back to Mock if Backend is offline or crashing (5xx)
+  // - Retains Real Backend error if it's a logic error (4xx like 400 Bad Request, 401 Unauthorized)
   private async withFallback<T>(
     realFn: () => Promise<T>, 
     mockFn: () => Promise<T>, 
     label: string
   ): Promise<T> {
     try {
-        // Attempt real API call
         return await realFn();
-    } catch (error) {
-        // If connection refused (Network Error) or other fetch issues, fallback
-        console.warn(`Real API (${label}) failed. Falling back to Mock API.`, error);
+    } catch (error: any) {
+        if (error instanceof ApiError) {
+            // If it's a Client Error (4xx), e.g., Wrong Password, Duplicate User
+            // We want the UI to show the REAL error, not fallback to Mock.
+            if (error.status >= 400 && error.status < 500) {
+                console.error(`Real API (${label}) Client Error ${error.status}:`, error.message);
+                throw error;
+            }
+        }
+
+        // If Network Error (TypeError) or Server Error (5xx)
+        console.warn(`Real API (${label}) unavailable (Network/Server Error). Switching to Mock Data.`);
         return mockFn();
     }
   }
@@ -227,11 +249,13 @@ class RealApiService {
     return this.withFallback(
         async () => {
             const res = await fetch(`${API_URL}/orders/user/${userId}`);
-            if (!res.ok) return 0;
-            const orders: Order[] = await res.json();
-            return orders
+            // If API not implemented on backend yet (404), return 0 or fallback logic
+            if (res.status === 404) return 0; 
+            return this.handleResponse(res).then((orders: Order[]) => 
+                orders
                 .filter(o => o.status === 'delivered')
-                .reduce((acc, curr) => acc + curr.total, 0);
+                .reduce((acc, curr) => acc + curr.total, 0)
+            );
         },
         () => mockApi.getUserTotalSpending(userId),
         'getUserTotalSpending'
