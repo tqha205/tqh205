@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/mockApi';
+import { api } from '../services/realApi';
 import { User, Lock, Smartphone, ArrowRight, AtSign, CheckCircle2, ShieldCheck, CreditCard, Ticket } from 'lucide-react';
 
 const Register: React.FC = () => {

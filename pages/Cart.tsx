@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { Trash2, Plus, Minus, ArrowLeft, ShoppingBag, CreditCard, CheckCircle, Loader2, User, Phone, MapPin, Calendar, X, Wallet, Banknote, LogIn, AlertCircle, Ticket, Tag, Search } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, formatCurrency } from '../services/mockApi';
+import { api, formatCurrency } from '../services/realApi';
 import { useAuth } from '../context/AuthContext';
 import { PaymentMethod, Coupon } from '../types';
 

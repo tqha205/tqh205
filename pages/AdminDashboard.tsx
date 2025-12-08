@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { api, formatCurrency } from '../services/mockApi';
+import { api, formatCurrency } from '../services/realApi';
 import { useAuth } from '../context/AuthContext';
 import { Order } from '../types';
 import { DollarSign, Package, ShoppingCart, Users } from 'lucide-react';

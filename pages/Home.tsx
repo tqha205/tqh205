@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, formatCurrency } from '../services/mockApi';
+import { api, formatCurrency } from '../services/realApi';
 import { Product, MembershipTier } from '../types';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';

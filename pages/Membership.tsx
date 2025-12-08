@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Crown, Star, Shield, ArrowRight, CheckCircle2, Trophy, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { api, formatCurrency } from '../services/mockApi';
+import { api, formatCurrency } from '../services/realApi';
 
 const Membership: React.FC = () => {
   const { user, isAuthenticated } = useAuth();

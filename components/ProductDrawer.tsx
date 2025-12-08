@@ -4,7 +4,7 @@ import { X, ShoppingBag, Check, ShieldCheck, Truck, LogIn } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { formatCurrency } from '../services/mockApi';
+import { formatCurrency } from '../services/realApi';
 
 interface ProductDrawerProps {
   product: Product | null;

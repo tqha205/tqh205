@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { ShoppingCart, LogOut, User, Menu, X, Smartphone, Crown, Ticket, Tag, CheckCircle2 } from 'lucide-react';
-import { formatCurrency } from '../services/mockApi';
+import { formatCurrency } from '../services/realApi';
 
 const Layout: React.FC = () => {
   const { user, isAuthenticated, logout, isAdmin, isStaff } = useAuth();

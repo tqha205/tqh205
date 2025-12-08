@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, formatCurrency } from '../services/mockApi';
+import { api, formatCurrency } from '../services/realApi';
 import { Order } from '../types';
 import { ShoppingBag, Search, Eye, Filter, CheckCircle2, Clock, Truck, XCircle, ChevronDown, MapPin, Phone, User, Calendar, CreditCard, AlertTriangle, Package, Star, MessageSquareQuote } from 'lucide-react';
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, formatCurrency } from '../services/mockApi';
+import { api, formatCurrency } from '../services/realApi';
 import { Product } from '../types';
 import { Edit, Trash2, Plus, X, Search, Package, AlertCircle, CheckCircle2, Image as ImageIcon, Upload, FileText, List, ArrowUpDown, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 
