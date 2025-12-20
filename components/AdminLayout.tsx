@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Package, Users, ShoppingBag, LogOut, Store } from 'lucide-react';
+import { LayoutDashboard, Package, Users, ShoppingBag, LogOut, Store, ClipboardList, Truck } from 'lucide-react';
 
 const AdminLayout: React.FC = () => {
   const { logout, isAdmin, isStaff } = useAuth();
@@ -16,8 +17,10 @@ const AdminLayout: React.FC = () => {
   const navItems = [
     { path: '/admin', icon: LayoutDashboard, label: 'Tổng quan' },
     { path: '/admin/products', icon: Package, label: 'Sản phẩm' },
+    { path: '/admin/inventory', icon: ClipboardList, label: 'Nhập kho' },
+    { path: '/admin/suppliers', icon: Truck, label: 'Nhà cung cấp' }, // New Item
     { path: '/admin/orders', icon: ShoppingBag, label: 'Đơn hàng' },
-    { path: '/admin/users', icon: Users, label: 'Người dùng' },
+    { path: '/admin/users', icon: Users, label: 'Người dùng & NV' },
   ];
 
   return (
@@ -66,7 +69,7 @@ const AdminLayout: React.FC = () => {
 
           <button
             onClick={handleLogout}
-            className="flex items-center w-full px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-lg transition"
+            className="flex-1 flex items-center w-full px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-lg transition"
           >
             <LogOut className="w-5 h-5 mr-3" />
             Đăng xuất

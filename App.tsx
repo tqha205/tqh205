@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -14,6 +15,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminProducts from './pages/AdminProducts';
 import AdminOrders from './pages/AdminOrders';
 import AdminUsers from './pages/AdminUsers';
+import AdminInventory from './pages/AdminInventory';
+import AdminSuppliers from './pages/AdminSuppliers';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin }: React.PropsWithChildren<{ requireAdmin?: boolean }>) => {
@@ -22,7 +25,6 @@ const ProtectedRoute = ({ children, requireAdmin }: React.PropsWithChildren<{ re
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   
   // If requireAdmin is true, allow both Admin and Staff (Backoffice access)
-  // Logic for restricting specific features (like Internal Users) is handled within the components
   if (requireAdmin && !isAdmin && !isStaff) return <Navigate to="/" replace />;
   
   return <>{children}</>;
@@ -52,6 +54,8 @@ const App: React.FC = () => {
             }>
               <Route index element={<AdminDashboard />} />
               <Route path="products" element={<AdminProducts />} />
+              <Route path="inventory" element={<AdminInventory />} />
+              <Route path="suppliers" element={<AdminSuppliers />} />
               <Route path="orders" element={<AdminOrders />} />
               <Route path="users" element={<AdminUsers />} />
             </Route>

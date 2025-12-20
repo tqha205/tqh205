@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import { api, formatCurrency } from '../services/realApi';
 import { Product } from '../types';
-import { Edit, Trash2, Plus, X, Search, Package, AlertCircle, CheckCircle2, Image as ImageIcon, Upload, FileText, List, ArrowUpDown, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { Edit, Trash2, Plus, X, Search, Package, AlertCircle, CheckCircle2, Image as ImageIcon, Upload, FileText, List, ArrowUpDown, ChevronLeft, ChevronRight, Zap, ScanBarcode, QrCode } from 'lucide-react';
 
 type SortKey = 'name' | 'price' | 'stock';
 type SortDirection = 'asc' | 'desc';
@@ -15,6 +16,12 @@ const AdminProducts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   
+  // IMEI Modal State
+  const [isImeiModalOpen, setIsImeiModalOpen] = useState(false);
+  const [selectedProductForImei, setSelectedProductForImei] = useState<Product | null>(null);
+  const [imeiInput, setImeiInput] = useState('');
+  const [imeiSearch, setImeiSearch] = useState('');
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -33,9 +40,11 @@ const AdminProducts: React.FC = () => {
     // Filter first
     let result = products;
     if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
       result = products.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.brand.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(lowerTerm) ||
+        p.brand.toLowerCase().includes(lowerTerm) ||
+        (p.imeis && p.imeis.some(imei => imei.includes(searchTerm))) // IMEI Search Logic
       );
     }
 
@@ -109,21 +118,24 @@ const AdminProducts: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const productData = {
-        name: currentProduct.name!,
-        brand: currentProduct.brand!,
-        price: Number(currentProduct.price), // Giá bán (khuyến mãi)
-        originalPrice: Number(currentProduct.originalPrice), // Giá gốc
+      // Fixed: Explicitly defining productData as Omit<Product, 'id'> to ensure all required fields are present
+      const productData: Omit<Product, 'id'> = {
+        name: currentProduct.name || '',
+        brand: currentProduct.brand || '',
+        price: Number(currentProduct.price || 0), 
+        originalPrice: currentProduct.originalPrice !== undefined ? Number(currentProduct.originalPrice) : undefined, 
         category: 'Smartphone',
-        stock: Number(currentProduct.stock),
+        stock: Number(currentProduct.stock || 0),
+        status: (currentProduct.status as any) || (Number(currentProduct.stock || 0) > 0 ? 'Kinh doanh' : 'Hết hàng'),
         image: currentProduct.image || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&q=80&w=800',
-        description: currentProduct.description || '',
+        description: currentProduct.description || 'Mô tả đang cập nhật',
         features: typeof currentProduct.features === 'string' 
           ? (currentProduct.features as string).split('\n').filter((f: string) => f.trim() !== '') 
-          : currentProduct.features,
+          : (currentProduct.features || []),
         promotion: currentProduct.promotion,
-        discountAmount: Number(currentProduct.discountAmount || 0),
-        discountCondition: currentProduct.discountCondition || 'all'
+        discountAmount: currentProduct.discountAmount !== undefined ? Number(currentProduct.discountAmount) : undefined,
+        discountCondition: currentProduct.discountCondition,
+        imeis: currentProduct.imeis || []
       };
 
       if (currentProduct.id) {
@@ -134,7 +146,7 @@ const AdminProducts: React.FC = () => {
         showNotification('Tạo sản phẩm mới thành công', 'success');
       }
       setIsModalOpen(false);
-      loadProducts(); // Refresh list immediately
+      loadProducts(); 
     } catch (error) {
       showNotification('Lưu sản phẩm thất bại', 'error');
     }
@@ -160,13 +172,56 @@ const AdminProducts: React.FC = () => {
   };
 
   const openModal = (product: Partial<Product> = {}) => {
-    // Convert array features to string for textarea editing if necessary
     const processedProduct = {
       ...product,
       features: Array.isArray(product.features) ? product.features.join('\n') : product.features
     };
     setCurrentProduct(processedProduct as any);
     setIsModalOpen(true);
+  };
+
+  const openImeiModal = (product: Product) => {
+      setSelectedProductForImei(product);
+      setIsImeiModalOpen(true);
+      setImeiInput('');
+      setImeiSearch('');
+  };
+
+  const handleAddImei = async () => {
+      if (!selectedProductForImei || !imeiInput.trim()) return;
+      const newImeis = [...(selectedProductForImei.imeis || [])];
+      
+      if (newImeis.includes(imeiInput.trim())) {
+          showNotification('IMEI này đã tồn tại', 'error');
+          return;
+      }
+
+      newImeis.push(imeiInput.trim());
+      
+      try {
+          await api.updateProduct(selectedProductForImei.id, { imeis: newImeis });
+          setSelectedProductForImei({ ...selectedProductForImei, imeis: newImeis });
+          // Update local state to reflect instantly
+          setProducts(products.map(p => p.id === selectedProductForImei.id ? { ...p, imeis: newImeis } : p));
+          setImeiInput('');
+          showNotification('Đã thêm IMEI', 'success');
+      } catch (error) {
+          showNotification('Lỗi khi thêm IMEI', 'error');
+      }
+  };
+
+  const handleRemoveImei = async (imeiToRemove: string) => {
+      if (!selectedProductForImei) return;
+      const newImeis = (selectedProductForImei.imeis || []).filter(i => i !== imeiToRemove);
+      
+      try {
+          await api.updateProduct(selectedProductForImei.id, { imeis: newImeis });
+          setSelectedProductForImei({ ...selectedProductForImei, imeis: newImeis });
+          setProducts(products.map(p => p.id === selectedProductForImei.id ? { ...p, imeis: newImeis } : p));
+          showNotification('Đã xóa IMEI', 'success');
+      } catch (error) {
+          showNotification('Lỗi khi xóa IMEI', 'error');
+      }
   };
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -234,7 +289,7 @@ const AdminProducts: React.FC = () => {
         <div className="relative max-w-md">
           <input
             type="text"
-            placeholder="Tìm kiếm theo tên hoặc thương hiệu..."
+            placeholder="Tìm kiếm tên, hãng hoặc IMEI..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-11 pr-4 py-3 rounded-lg border border-gray-200 focus:border-primary focus:ring-4 focus:ring-blue-500/10 transition outline-none"
@@ -294,7 +349,7 @@ const AdminProducts: React.FC = () => {
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                     <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    Không tìm thấy sản phẩm. Hãy thêm sản phẩm mới!
+                    Không tìm thấy sản phẩm.
                   </td>
                 </tr>
               ) : (
@@ -312,10 +367,15 @@ const AdminProducts: React.FC = () => {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-bold text-gray-900">{product.name}</div>
-                          <div className="text-xs text-gray-500">{product.category}</div>
+                          {/* Search Highlight for IMEI */}
+                          {searchTerm && product.imeis?.some(i => i.includes(searchTerm)) && (
+                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold border border-green-200 flex items-center gap-1 w-fit mt-1">
+                                  <CheckCircle2 className="w-3 h-3" /> Tìm thấy qua IMEI
+                              </span>
+                          )}
                           {product.discountAmount && product.discountAmount > 0 && (
-                            <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-medium mt-1 inline-block border border-red-100">
-                                Giảm thêm {formatCurrency(product.discountAmount)} (TT)
+                            <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-medium mt-1 inline-block border border-red-100 ml-1">
+                                -{formatCurrency(product.discountAmount)}
                             </span>
                           )}
                         </div>
@@ -346,11 +406,18 @@ const AdminProducts: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-3">
-                        <button onClick={() => openModal(product)} className="text-gray-400 hover:text-blue-600 transition-colors p-1 hover:bg-blue-50 rounded-full">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                            onClick={() => openImeiModal(product)}
+                            className="text-gray-400 hover:text-purple-600 transition-colors p-2 hover:bg-purple-50 rounded-full"
+                            title="Quản lý IMEI"
+                        >
+                            <ScanBarcode className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => openModal(product)} className="text-gray-400 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-full">
                           <Edit className="w-5 h-5" />
                         </button>
-                        <button onClick={() => initiateDelete(product.id)} className="text-gray-400 hover:text-red-600 transition-colors p-1 hover:bg-red-50 rounded-full">
+                        <button onClick={() => initiateDelete(product.id)} className="text-gray-400 hover:text-red-600 transition-colors p-2 hover:bg-red-50 rounded-full">
                           <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
@@ -406,14 +473,11 @@ const AdminProducts: React.FC = () => {
         )}
       </div>
 
-      {/* Modal - Styled with Tailwind Backdrop Blur */}
+      {/* Modal: Edit/Create Product */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-            {/* Backdrop */}
             <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsModalOpen(false)}></div>
-
-            {/* Modal Panel */}
             <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg max-h-[90vh] flex flex-col">
               <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4 flex-grow overflow-y-auto">
                 <div className="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 pb-2 border-b border-gray-100">
@@ -449,40 +513,22 @@ const AdminProducts: React.FC = () => {
                       </label>
                     </div>
                      <p className="text-xs text-gray-500 mt-1">Nhập URL hoặc tải ảnh từ thiết bị (sẽ được chuyển đổi thành Base64)</p>
-                     
                      {currentProduct.image && (
                        <div className="mt-4 w-full rounded-xl border border-gray-200 overflow-hidden bg-gray-50 flex justify-center items-center p-2">
-                         <img 
-                           src={currentProduct.image} 
-                           alt="Preview" 
-                           className="max-w-full h-auto max-h-[400px] object-contain shadow-sm rounded-lg" 
-                           onError={handleImageError}
-                         />
+                         <img src={currentProduct.image} alt="Preview" className="max-w-full h-auto max-h-[400px] object-contain shadow-sm rounded-lg" onError={handleImageError} />
                        </div>
                      )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Tên sản phẩm</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ví dụ: iPhone 15 Pro"
-                      value={currentProduct.name || ''}
-                      onChange={e => setCurrentProduct({ ...currentProduct, name: e.target.value })}
-                      className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition"
-                    />
+                    <input type="text" required placeholder="Ví dụ: iPhone 15 Pro" value={currentProduct.name || ''} onChange={e => setCurrentProduct({ ...currentProduct, name: e.target.value })} className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-5">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">Thương hiệu</label>
-                      <select
-                        required
-                        value={currentProduct.brand || ''}
-                        onChange={e => setCurrentProduct({ ...currentProduct, brand: e.target.value })}
-                        className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition bg-white"
-                      >
+                      <select required value={currentProduct.brand || ''} onChange={e => setCurrentProduct({ ...currentProduct, brand: e.target.value })} className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition bg-white" >
                         <option value="">Chọn thương hiệu</option>
                         <option value="Apple">Apple</option>
                         <option value="Samsung">Samsung</option>
@@ -496,15 +542,7 @@ const AdminProducts: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">Số lượng tồn kho</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        placeholder="0"
-                        value={currentProduct.stock || ''}
-                        onChange={e => setCurrentProduct({ ...currentProduct, stock: parseInt(e.target.value) })}
-                        className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition"
-                      />
+                      <input type="number" min="0" required placeholder="0" value={currentProduct.stock || ''} onChange={e => setCurrentProduct({ ...currentProduct, stock: parseInt(e.target.value || '0') })} className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition" />
                     </div>
                   </div>
 
@@ -516,28 +554,11 @@ const AdminProducts: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                         <label className="block text-xs font-semibold text-blue-700 mb-1">Giá gốc (Niêm yết)</label>
-                        <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            placeholder="0"
-                            value={currentProduct.originalPrice || ''}
-                            onChange={e => setCurrentProduct({ ...currentProduct, originalPrice: parseFloat(e.target.value) })}
-                            className="w-full rounded-lg border-blue-200 border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
-                        />
+                        <input type="number" min="0" step="1000" placeholder="0" value={currentProduct.originalPrice || ''} onChange={e => setCurrentProduct({ ...currentProduct, originalPrice: parseFloat(e.target.value || '0') })} className="w-full rounded-lg border-blue-200 border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition" />
                         </div>
                         <div>
                         <label className="block text-xs font-bold text-blue-700 mb-1">Giá bán (Khuyến mãi)</label>
-                        <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            required
-                            placeholder="0"
-                            value={currentProduct.price || ''}
-                            onChange={e => setCurrentProduct({ ...currentProduct, price: parseFloat(e.target.value) })}
-                            className="w-full rounded-lg border-blue-200 border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition font-bold text-blue-700"
-                        />
+                        <input type="number" min="0" step="1000" required placeholder="0" value={currentProduct.price || ''} onChange={e => setCurrentProduct({ ...currentProduct, price: parseFloat(e.target.value || '0') })} className="w-full rounded-lg border-blue-200 border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition font-bold text-blue-700" />
                         </div>
                     </div>
                   </div>
@@ -550,23 +571,11 @@ const AdminProducts: React.FC = () => {
                      <div className="grid grid-cols-2 gap-4 mb-3">
                          <div>
                             <label className="block text-xs font-semibold text-yellow-700 mb-1">Giảm thêm (VND)</label>
-                            <input
-                                type="number"
-                                min="0"
-                                step="1000"
-                                placeholder="0"
-                                value={currentProduct.discountAmount || ''}
-                                onChange={e => setCurrentProduct({ ...currentProduct, discountAmount: parseFloat(e.target.value) })}
-                                className="w-full rounded-lg border-yellow-200 border px-3 py-2 text-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition"
-                            />
+                            <input type="number" min="0" step="1000" placeholder="0" value={currentProduct.discountAmount || ''} onChange={e => setCurrentProduct({ ...currentProduct, discountAmount: parseFloat(e.target.value || '0') })} className="w-full rounded-lg border-yellow-200 border px-3 py-2 text-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition" />
                          </div>
                          <div>
                             <label className="block text-xs font-semibold text-yellow-700 mb-1">Điều kiện áp dụng</label>
-                            <select
-                                value={currentProduct.discountCondition || 'all'}
-                                onChange={e => setCurrentProduct({ ...currentProduct, discountCondition: e.target.value as any })}
-                                className="w-full rounded-lg border-yellow-200 border px-3 py-2 text-sm bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition"
-                            >
+                            <select value={currentProduct.discountCondition || 'all'} onChange={e => setCurrentProduct({ ...currentProduct, discountCondition: e.target.value as any })} className="w-full rounded-lg border-yellow-200 border px-3 py-2 text-sm bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition" >
                                 <option value="all">Tất cả hình thức</option>
                                 <option value="banking">Chuyển khoản (Banking)</option>
                                 <option value="cod">Tiền mặt (COD)</option>
@@ -575,13 +584,7 @@ const AdminProducts: React.FC = () => {
                      </div>
                      <div>
                         <label className="block text-xs font-semibold text-yellow-700 mb-1">Mô tả ưu đãi (Hiển thị cho khách)</label>
-                        <input
-                            type="text"
-                            placeholder="Ví dụ: Giảm 2 triệu khi thanh toán chuyển khoản"
-                            value={currentProduct.promotion || ''}
-                            onChange={e => setCurrentProduct({ ...currentProduct, promotion: e.target.value })}
-                            className="w-full rounded-lg border-yellow-200 border px-3 py-2 text-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition"
-                        />
+                        <input type="text" placeholder="Ví dụ: Giảm 2 triệu khi thanh toán chuyển khoản" value={currentProduct.promotion || ''} onChange={e => setCurrentProduct({ ...currentProduct, promotion: e.target.value })} className="w-full rounded-lg border-yellow-200 border px-3 py-2 text-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition" />
                      </div>
                   </div>
 
@@ -590,13 +593,7 @@ const AdminProducts: React.FC = () => {
                     <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
                       <FileText className="w-4 h-4" /> Mô tả sản phẩm
                     </label>
-                    <textarea
-                      rows={4}
-                      placeholder="Mô tả chi tiết về sản phẩm..."
-                      value={currentProduct.description || ''}
-                      onChange={e => setCurrentProduct({ ...currentProduct, description: e.target.value })}
-                      className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition resize-y"
-                    />
+                    <textarea rows={4} placeholder="Mô tả chi tiết về sản phẩm..." value={currentProduct.description || ''} onChange={e => setCurrentProduct({ ...currentProduct, description: e.target.value })} className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition resize-y" />
                   </div>
 
                   {/* Features Field */}
@@ -604,35 +601,103 @@ const AdminProducts: React.FC = () => {
                     <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
                       <List className="w-4 h-4" /> Tính năng nổi bật (Mỗi dòng một tính năng)
                     </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Ví dụ:&#10;Chip A17 Pro&#10;Camera 48MP"
-                      value={(currentProduct.features as unknown as string) || ''}
-                      onChange={e => setCurrentProduct({ ...currentProduct, features: e.target.value as unknown as string[] })}
-                      className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition resize-y font-mono text-sm"
-                    />
+                    <textarea rows={3} placeholder="Ví dụ:&#10;Chip A17 Pro&#10;Camera 48MP" value={(currentProduct.features as any) || ''} onChange={e => setCurrentProduct({ ...currentProduct, features: e.target.value as any })} className="w-full rounded-lg border-gray-300 border px-4 py-2.5 text-gray-900 focus:border-primary focus:ring-4 focus:ring-blue-500/10 outline-none transition resize-y font-mono text-sm" />
                   </div>
 
                   <div className="bg-gray-50 -mx-6 -mb-6 px-6 py-4 flex justify-end gap-3 mt-4 sticky bottom-0 border-t border-gray-100">
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition"
-                    >
-                      Hủy bỏ
-                    </button>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition"
-                    >
-                      {currentProduct.id ? 'Lưu thay đổi' : 'Tạo mới'}
-                    </button>
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition" >Hủy bỏ</button>
+                    <button type="submit" className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition" >{currentProduct.id ? 'Lưu thay đổi' : 'Tạo mới'}</button>
                   </div>
                 </form>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* IMEI Management Modal */}
+      {isImeiModalOpen && selectedProductForImei && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setIsImeiModalOpen(false)}></div>
+              <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg max-h-[80vh] flex flex-col">
+                  <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                      <div>
+                          <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                              <ScanBarcode className="w-6 h-6 text-primary" /> Quản lý IMEI
+                          </h3>
+                          <p className="text-sm text-gray-500">{selectedProductForImei.name}</p>
+                      </div>
+                      <button onClick={() => setIsImeiModalOpen(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X className="w-5 h-5 text-gray-500" /></button>
+                  </div>
+
+                  {/* Add IMEI */}
+                  <div className="flex gap-2 mb-6">
+                      <input 
+                          type="text" 
+                          placeholder="Nhập hoặc Scan IMEI mới..." 
+                          className="flex-grow border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary/20 outline-none"
+                          value={imeiInput}
+                          onChange={(e) => setImeiInput(e.target.value)}
+                          onKeyDown={(e) => { if(e.key === 'Enter') handleAddImei() }}
+                      />
+                      <button onClick={handleAddImei} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 whitespace-nowrap">Thêm</button>
+                  </div>
+
+                  {/* Search within Modal */}
+                  <div className="mb-2 relative">
+                      <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                      <input 
+                          type="text" 
+                          placeholder="Tìm trong danh sách..." 
+                          className="w-full pl-9 border border-gray-200 rounded-lg py-2 text-sm bg-gray-50 focus:bg-white focus:border-primary outline-none"
+                          value={imeiSearch}
+                          onChange={(e) => setImeiSearch(e.target.value)}
+                      />
+                  </div>
+
+                  {/* List */}
+                  <div className="flex-grow overflow-y-auto border border-gray-200 rounded-xl">
+                      <table className="w-full text-sm text-left">
+                          <thead className="bg-gray-50 text-gray-500 uppercase text-xs sticky top-0">
+                              <tr>
+                                  <th className="px-4 py-3">STT</th>
+                                  <th className="px-4 py-3">Mã IMEI</th>
+                                  <th className="px-4 py-3 text-right">Hành động</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {selectedProductForImei.imeis && selectedProductForImei.imeis.length > 0 ? (
+                                  selectedProductForImei.imeis
+                                    .filter(i => i.includes(imeiSearch))
+                                    .map((imei, idx) => (
+                                      <tr key={idx} className="hover:bg-gray-50">
+                                          <td className="px-4 py-3 text-gray-500">{idx + 1}</td>
+                                          <td className="px-4 py-3 font-mono font-medium text-gray-900">{imei}</td>
+                                          <td className="px-4 py-3 text-right">
+                                              <button onClick={() => handleRemoveImei(imei)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg">
+                                                  <Trash2 className="w-4 h-4" />
+                                              </button>
+                                          </td>
+                                      </tr>
+                                  ))
+                              ) : (
+                                  <tr>
+                                      <td colSpan={3} className="text-center py-8 text-gray-400">
+                                          <QrCode className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                          Chưa có dữ liệu IMEI
+                                      </td>
+                                  </tr>
+                              )}
+                          </tbody>
+                      </table>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center text-sm text-gray-500">
+                      <span>Tổng số lượng IMEI: <strong className="text-gray-900">{selectedProductForImei.imeis?.length || 0}</strong></span>
+                      <span className="text-xs italic bg-yellow-50 text-yellow-700 px-2 py-1 rounded border border-yellow-100">Lưu ý: Stock sẽ tự cập nhật theo số lượng này (Future)</span>
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );

@@ -8,7 +8,7 @@ import { PaymentMethod, Coupon } from '../types';
 
 const Cart: React.FC = () => {
   const { cart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, refreshUserData } = useAuth();
   const navigate = useNavigate();
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -122,10 +122,15 @@ const Cart: React.FC = () => {
         total: finalTotal, // Use final total with discount applied
       });
       
+      // ORDER SUCCESS
       setOrderId(newOrder.id);
       setIsCheckoutOpen(false);
       setOrderSuccess(true);
       clearCart();
+      
+      // IMPORTANT: Refresh User Data to update Tier & Coupons immediately
+      await refreshUserData();
+      
     } catch (error) {
       setErrorModal({show: true, message: "Có lỗi xảy ra khi thanh toán. Vui lòng thử lại."});
     } finally {
@@ -143,8 +148,8 @@ const Cart: React.FC = () => {
         <p className="text-gray-500 mb-2 text-center">
           Cảm ơn bạn đã mua sắm. Mã đơn hàng của bạn là <span className="font-bold text-gray-900">#{orderId}</span>.
         </p>
-        <p className="text-gray-500 mb-8 text-center max-w-md">
-          Đơn hàng sẽ sớm được xử lý và giao đến bạn.
+        <p className="text-green-600 font-medium mb-8 text-center max-w-md bg-green-50 px-4 py-2 rounded-lg border border-green-100">
+           Hạng thành viên và điểm tích lũy của bạn đã được cập nhật!
         </p>
         <div className="flex gap-4">
           <Link 

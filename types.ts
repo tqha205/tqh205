@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   STAFF = 'STAFF',
@@ -6,21 +7,11 @@ export enum UserRole {
 
 export type MembershipTier = 'silver' | 'gold' | 'diamond';
 
-export interface Coupon {
-  code: string;
-  discount: number;
-  description: string;
-}
-
-export interface User {
+export interface Warehouse {
   id: string;
   name: string;
-  username: string;
-  role: UserRole;
-  password?: string;
-  coupons?: Coupon[];
-  tier?: MembershipTier; // Hạng thành viên
-  points?: number; // Điểm tích lũy
+  address: string;
+  description?: string;
 }
 
 export interface Review {
@@ -29,6 +20,12 @@ export interface Review {
   rating: number;
   comment: string;
   date: string;
+}
+
+export interface Coupon {
+  code: string;
+  discount: number;
+  description: string;
 }
 
 export interface Product {
@@ -40,23 +37,61 @@ export interface Product {
   image: string;
   category: string;
   stock: number;
+  warehouseId?: string;
+  status: 'Kinh doanh' | 'Ngừng kinh doanh' | 'Hết hàng';
   description?: string;
   features?: string[];
   reviews?: Review[];
   promotion?: string;
   discountAmount?: number;
-  discountCondition?: 'banking' | 'cod' | 'all';
+  discountCondition?: string;
+  imeis?: string[];
+}
+
+export interface StockReceiptDetail {
+  productId: string;
+  productName?: string;
+  quantity: number;
+  unitPrice: number;
+  warrantyMonths?: number;
+  imeis?: string[];
+}
+
+export interface InventoryLog {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  type: 'import' | 'export' | 'audit';
+  quantity: number;
+  reason: string;
+  supplierName?: string;
+  date: string;
+  performedBy: string;
+  imeis?: string[]; 
+}
+
+export interface User {
+  id: string;
+  name: string;
+  username: string;
+  password?: string;
+  role: UserRole;
+  tier?: MembershipTier;
+  points?: number;
+  coupons?: Coupon[];
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
 }
 
 export interface CartItem extends Product {
   quantity: number;
-}
-
-export interface OrderCustomerInfo {
-  name: string;
-  phone: string;
-  address: string;
-  birthYear: string;
 }
 
 export type PaymentMethod = 'cod' | 'banking';
@@ -65,7 +100,12 @@ export interface Order {
   id: string;
   userId: string;
   customerName: string;
-  customerInfo: OrderCustomerInfo;
+  customerInfo: {
+    name: string;
+    phone: string;
+    address: string;
+    birthYear: string;
+  };
   paymentMethod: PaymentMethod;
   items: CartItem[];
   total: number;

@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '../types';
+import { api } from '../services/realApi';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (user: User, token: string) => void;
   logout: () => void;
+  refreshUserData: () => Promise<void>;
   isAdmin: boolean;
   isStaff: boolean;
   isAuthenticated: boolean;
@@ -40,12 +42,26 @@ export const AuthProvider = ({ children }: React.PropsWithChildren<{}>) => {
     localStorage.removeItem('token');
   };
 
+  // Helper to re-fetch user data (Tier, Coupons) from backend without re-login
+  const refreshUserData = async () => {
+      if (!user || !token) return;
+      try {
+          const updatedUser = await api.getUserProfile(user.id);
+          if (updatedUser) {
+              setUser(updatedUser);
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+          }
+      } catch (error) {
+          console.error("Failed to refresh user data", error);
+      }
+  };
+
   const isAdmin = user?.role === UserRole.ADMIN;
   const isStaff = user?.role === UserRole.STAFF;
   const isAuthenticated = !!token;
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAdmin, isStaff, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, token, login, logout, refreshUserData, isAdmin, isStaff, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );

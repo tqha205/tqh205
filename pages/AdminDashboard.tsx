@@ -1,140 +1,127 @@
+
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { api, formatCurrency } from '../services/realApi';
 import { useAuth } from '../context/AuthContext';
 import { Order } from '../types';
-import { DollarSign, Package, ShoppingCart, Users } from 'lucide-react';
+import { DollarSign, Package, ShoppingCart, Users, RefreshCw } from 'lucide-react';
 
 type TimeRange = '6m' | '1y' | 'all';
 
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState({ revenue: 0, orders: 0, products: 0, users: 0 });
-  const [allOrders, setAllOrders] = useState<Order[]>([]); // Store orders for chart processing
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('6m');
   const { isAdmin } = useAuth();
 
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const [products, orders, users] = await Promise.all([
-            api.getProducts(),
-            api.getOrders(),
-            api.getUsers()
-        ]);
-        
-        // Calculate Revenue ONLY for 'delivered' orders
-        const totalRevenue = orders
-          .filter(order => order.status === 'delivered')
-          .reduce((acc, order) => acc + order.total, 0);
+  const loadStats = async () => {
+    setLoading(true);
+    try {
+      const [products, orders, users] = await Promise.all([
+          api.getProducts(),
+          api.getOrders(),
+          api.getUsers()
+      ]);
+      
+      // Tính doanh thu thực tế (chỉ đơn 'delivered')
+      // Sử dụng toLowerCase() để chắc chắn khớp dữ liệu
+      const totalRevenue = orders
+        .filter(order => order.status?.toLowerCase() === 'delivered')
+        .reduce((acc, order) => acc + order.total, 0);
 
-        setStats({
-          revenue: totalRevenue,
-          orders: orders.length, // Total count of orders (all statuses)
-          products: products.length,
-          users: users.length
-        });
-        setAllOrders(orders);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setStats({
+        revenue: totalRevenue,
+        orders: orders.length,
+        products: products.length,
+        users: users.length
+      });
+      setAllOrders(orders);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadStats();
   }, []);
 
-  // Process orders to generate chart data based on time range
   const processChartData = (orders: Order[], range: TimeRange) => {
     if (orders.length === 0) return [];
-
     const now = new Date();
     const dataMap = new Map<string, number>();
-    
-    // Sort orders by date ascending just in case
     const sortedOrders = [...orders].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     if (range === 'all') {
-      // Group by Year for 'all'
       sortedOrders.forEach(order => {
-        // ONLY count revenue if status is 'delivered'
-        if (order.status === 'delivered') {
+        if (order.status?.toLowerCase() === 'delivered') {
           const year = new Date(order.date).getFullYear().toString();
           dataMap.set(year, (dataMap.get(year) || 0) + order.total);
         }
       });
-      // Ensure we have at least the current year if empty
       if (dataMap.size === 0) dataMap.set(now.getFullYear().toString(), 0);
-      
       return Array.from(dataMap.entries())
         .map(([name, amount]) => ({ name, amount }))
         .sort((a, b) => parseInt(a.name) - parseInt(b.name));
-    } 
-    else {
-      // Logic for 6 months and 1 year (Group by Month)
+    } else {
       let monthsToLookBack = range === '6m' ? 6 : 12;
-      
-      // Initialize buckets with 0 for the last N months to ensure continuity
       for (let i = monthsToLookBack - 1; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const key = `${d.getMonth() + 1}/${d.getFullYear()}`;
         dataMap.set(key, 0);
       }
-
       sortedOrders.forEach(order => {
         const d = new Date(order.date);
         const key = `${d.getMonth() + 1}/${d.getFullYear()}`;
-        
-        // Only add if this month key exists in our initialized range (buckets)
-        // AND status is 'delivered'
-        if (dataMap.has(key) && order.status === 'delivered') {
+        if (dataMap.has(key) && order.status?.toLowerCase() === 'delivered') {
           dataMap.set(key, (dataMap.get(key) || 0) + order.total);
         }
       });
-
       return Array.from(dataMap.entries()).map(([key, amount]) => {
         const [month, year] = key.split('/');
-        return { name: `Thg ${month}`, amount }; // Simplified label
+        return { name: `Thg ${month}`, amount };
       });
     }
   };
 
   const currentChartData = processChartData(allOrders, timeRange);
 
-  if (loading) return <div>Đang tải dữ liệu...</div>;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Tổng quan hệ thống</h1>
         
-        {/* Time Range Selector - Only show if Charts are visible (Admin) */}
-        {isAdmin && (
-          <div className="bg-white p-1 rounded-lg border border-gray-200 shadow-sm flex">
-            {[
-              { id: '6m', label: '6 Tháng' },
-              { id: '1y', label: '1 Năm' },
-              { id: 'all', label: 'Tất cả' },
-            ].map((range) => (
-              <button
-                key={range.id}
-                onClick={() => setTimeRange(range.id as TimeRange)}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                  timeRange === range.id
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex gap-2">
+          <button 
+            onClick={loadStats}
+            className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm"
+            title="Làm mới dữ liệu"
+          >
+            <RefreshCw className={`w-5 h-5 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          
+          {isAdmin && (
+            <div className="bg-white p-1 rounded-lg border border-gray-200 shadow-sm flex">
+              {['6m', '1y', 'all'].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setTimeRange(r as TimeRange)}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                    timeRange === r ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  {r === '6m' ? '6 Tháng' : r === '1y' ? '1 Năm' : 'Tất cả'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transform transition hover:-translate-y-1 hover:shadow-md duration-300">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-gray-500">Doanh thu thực tế</p>
@@ -147,7 +134,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transform transition hover:-translate-y-1 hover:shadow-md duration-300">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-gray-500">Tổng đơn hàng</p>
@@ -160,7 +147,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transform transition hover:-translate-y-1 hover:shadow-md duration-300">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-gray-500">Sản phẩm</p>
@@ -172,7 +159,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transform transition hover:-translate-y-1 hover:shadow-md duration-300">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-gray-500">Người dùng</p>
@@ -185,16 +172,12 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Charts - Only visible to ADMIN */}
       {isAdmin && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-[400px]">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-gray-400" /> Doanh thu thực tế (Đã giao)
-              </h3>
-              <span className="text-xs font-semibold px-2 py-1 bg-gray-100 rounded text-gray-500 uppercase">{timeRange === 'all' ? 'Theo năm' : 'Theo tháng'}</span>
-            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-gray-400" /> Doanh thu thực tế (Đã giao)
+            </h3>
             <ResponsiveContainer width="100%" height="85%">
               <AreaChart data={currentChartData}>
                 <defs>
@@ -216,12 +199,9 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-[400px]">
-             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+             <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
                 <Package className="w-5 h-5 text-gray-400" /> Xu hướng tăng trưởng (Doanh thu)
-              </h3>
-              <span className="text-xs font-semibold px-2 py-1 bg-gray-100 rounded text-gray-500 uppercase">{timeRange === 'all' ? 'Theo năm' : 'Theo tháng'}</span>
-             </div>
+             </h3>
              <ResponsiveContainer width="100%" height="85%">
               <BarChart data={currentChartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
