@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/realApi';
 import { UserRole } from '../types';
-import { User, Lock, Smartphone, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { User, Lock, Smartphone, ArrowRight, AlertCircle, Loader2, Shield, Briefcase } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -29,22 +29,49 @@ const Login: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Tên đăng nhập hoặc mật khẩu không đúng');
+      setError('Tên đăng nhập hoặc mật khẩu không đúng');
     } finally {
       setLoading(false);
     }
   };
 
+  const fillCredentials = (u: string, p: string) => {
+    setUsername(u);
+    setPassword(p);
+    setError('');
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
         <div className="p-8 md:p-10">
-          <div className="text-center mb-10">
-             <div className="bg-primary/10 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="text-center mb-6">
+             <div className="bg-primary/10 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-in zoom-in duration-300">
                 <Smartphone className="w-8 h-8 text-primary" />
              </div>
-             <h2 className="text-3xl font-black text-gray-900">Chào mừng trở lại</h2>
-             <p className="text-gray-500 mt-2">Đăng nhập để tiếp tục trải nghiệm</p>
+             <h2 className="text-3xl font-black text-gray-900 tracking-tight">Chào mừng trở lại</h2>
+             <p className="text-gray-500 mt-2">Đăng nhập để quản lý và mua sắm</p>
+          </div>
+
+          {/* Quick Login Buttons for Testing */}
+          <div className="mb-6 bg-gray-50 p-3 rounded-xl border border-gray-200">
+            <p className="text-xs font-bold text-gray-400 uppercase text-center mb-2">Tài khoản Test nhanh</p>
+            <div className="flex gap-2">
+              <button 
+                type="button"
+                onClick={() => fillCredentials('admin', '123')}
+                className="flex-1 flex items-center justify-center gap-2 py-2 bg-purple-100 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-200 transition"
+              >
+                <Shield className="w-3 h-3" /> Admin
+              </button>
+              <button 
+                 type="button"
+                 onClick={() => fillCredentials('staff', '123')}
+                 className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-200 transition"
+              >
+                <Briefcase className="w-3 h-3" /> Staff
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -55,25 +82,25 @@ const Login: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Tên đăng nhập</label>
-              <div className="relative">
-                <User className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Tên đăng nhập</label>
+              <div className="relative group">
+                <User className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-primary transition-colors" />
                 <input 
                   type="text" required value={username} onChange={e => setUsername(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium"
-                  placeholder="admin, staff, customer..."
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium text-gray-900 placeholder:text-gray-400"
+                  placeholder="admin"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Mật khẩu</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Mật khẩu</label>
+              <div className="relative group">
+                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-primary transition-colors" />
                 <input 
                   type="password" required value={password} onChange={e => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-medium text-gray-900 placeholder:text-gray-400"
                   placeholder="••••••••"
                 />
               </div>
@@ -81,13 +108,13 @@ const Login: React.FC = () => {
 
             <button 
               type="submit" disabled={loading}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-500/30 hover:bg-blue-600 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg shadow-lg shadow-blue-500/30 hover:bg-blue-600 hover:shadow-blue-500/40 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="animate-spin" /> : <>Đăng nhập <ArrowRight className="w-5 h-5" /></>}
+              {loading ? <Loader2 className="animate-spin w-6 h-6" /> : <>Đăng nhập <ArrowRight className="w-5 h-5" /></>}
             </button>
           </form>
 
-          <div className="mt-8 text-center">
+          <div className="mt-8 text-center pt-6 border-t border-gray-100">
             <p className="text-gray-500">Chưa có tài khoản? <Link to="/register" className="text-primary font-black hover:underline">Đăng ký ngay</Link></p>
           </div>
         </div>
